@@ -11,6 +11,14 @@ MARKETS = {
     "OR": "XAU"
 }
 
+TIMEFRAMES = {
+    "M15": "15m",
+    "H1": "1H",
+    "H4": "4H",
+    "D1": "1D",
+    "W1": "1W"
+}
+
 def api_get(path, params):
     query = urllib.parse.urlencode(params)
     url = f"{BASE_URL}{path}?{query}"
@@ -23,55 +31,49 @@ def api_get(path, params):
     with urllib.request.urlopen(request, timeout=20) as response:
         return json.loads(response.read().decode("utf-8"))
 
-print("=== LIQUIDITIES HUNTER : TEST OKX ===")
+print("=== LIQUIDITIES HUNTER : TEST MULTI-TF OKX ===")
 
 found = []
 
 for inst_type in ["FUTURES", "SWAP"]:
-    print(f"\nRecherche dans {inst_type}...")
+    result = api_get(
+        "/api/v5/public/instruments",
+        {"instType": inst_type}
+    )
 
-    try:
-        result = api_get(
-            "/api/v5/public/instruments",
-            {"instType": inst_type}
-        )
+    if result.get("code") != "0":
+        print("Erreur instruments :", result.get("msg"))
+        continue
 
-        if result.get("code") != "0":
-            print("Erreur API :", result.get("msg"))
+    for instrument in result.get("data", []):
+        inst_id = instrument.get("instId", "")
+        if instrument.get("state") != "live":
             continue
 
-        for instrument in result.get("data", []):
-            inst_id = instrument.get("instId", "")
-            state = instrument.get("state", "")
+        upper_id = inst_id.upper()
 
-            if state != "live":
-                continue
+        for symbol, keyword in MARKETS.items():
+            if keyword in upper_id and "XPERP" in upper_id:
+                item = (symbol, inst_type, inst_id)
+                if item not in found:
+                    found.append(item)
 
-            upper_id = inst_id.upper()
+print("\n=== CONTRATS TROUVES ===")
+for symbol, inst_type, inst_id in found:
+    print(symbol, "-", inst_id)
 
-            for symbol, keyword in MARKETS.items():
-                if keyword in upper_id and (
-                    "XPERP" in upper_id or "X-PERP" in upper_id
-                ):
-                    found.append((symbol, inst_type, inst_id))
-                    print(f"{symbol} : {inst_id}")
+print("\n=== TEST DES BOUGIES ===")
 
-    except Exception as error:
-        print("Erreur :", error)
+for symbol, inst_type, inst_id in found:
+    print(f"\n--- {symbol} : {inst_id} ---")
 
-print("\n=== TEST DES BOUGIES M15 ===")
-
-if not found:
-    print("Aucun contrat X-Perp trouvé.")
-    print("Il faudra vérifier les identifiants avec une autre requête.")
-else:
-    for symbol, inst_type, inst_id in found:
+    for label, bar in TIMEFRAMES.items():
         try:
             result = api_get(
                 "/api/v5/market/candles",
                 {
                     "instId": inst_id,
-                    "bar": "15m",
+                    "bar": bar,
                     "limit": "2"
                 }
             )
@@ -79,16 +81,11 @@ else:
             data = result.get("data", [])
 
             if result.get("code") == "0" and data:
-                candle = data[0]
-                print(
-                    f"OK - {symbol} - {inst_id} "
-                    f"- Dernière clôture : {candle[4]}"
-                )
+                print(f"OK - {label} - Cloture : {data[0][4]}")
             else:
-                print(f"ECHEC - {inst_id} : {result.get('msg')}")
+                print(f"ECHEC - {label} - {result.get('msg')}")
 
         except Exception as error:
-            print(f"ERREUR - {inst_id} : {error}")
+            print(f"ERREUR - {label} - {error}")
 
 print("\n=== FIN DU TEST ===")
-

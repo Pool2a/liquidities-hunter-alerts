@@ -1,1 +1,26 @@
 
+name: Test OKX X-Perps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'test_okx.py'
+      - '.github/workflows/test-okx.yml'
+
+jobs:
+  test-okx:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Recuperer le depot
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Tester les contrats OKX
+        run: python test_okx.py
+

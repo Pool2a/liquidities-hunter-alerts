@@ -212,11 +212,23 @@ def detect_equal_levels(pivots):
                 )
 
                 if difference <= tolerance:
-                    signals.append(pivot)
+                    signals.append({
+                        "first": previous,
+                        "second": pivot,
+                        "difference": difference,
+                        "tolerance": tolerance
+                    })
 
         previous = pivot
 
     return signals
+
+
+def format_date(timestamp):
+    return datetime.fromtimestamp(
+        timestamp / 1000,
+        timezone.utc
+    ).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def display_levels(title, signals):
@@ -229,23 +241,42 @@ def display_levels(title, signals):
 
     for number, signal in enumerate(signals, start=1):
 
-        date = datetime.fromtimestamp(
-            signal["time"] / 1000,
-            timezone.utc
-        ).strftime("%Y-%m-%d %H:%M UTC")
+        first = signal["first"]
+        second = signal["second"]
+
+        print("\nDétection", number)
 
         print(
-            number,
-            "| Prix :",
-            signal["price"],
-            "| Date :",
-            date
+            "Premier pivot :",
+            first["price"],
+            "|",
+            format_date(first["time"])
+        )
+
+        print(
+            "Deuxième pivot :",
+            second["price"],
+            "|",
+            format_date(second["time"])
+        )
+
+        print(
+            "Écart entre les pivots :",
+            round(signal["difference"], 2),
+            "USD"
+        )
+
+        print(
+            "Tolérance autorisée :",
+            round(signal["tolerance"], 2),
+            "USD"
         )
 
 
 def main():
     print("================================")
     print(" LIQUIDITIES HUNTER - EQH/EQL")
+    print(" AFFICHAGE DETAILLE V2")
     print("================================")
 
     contracts = find_contracts()

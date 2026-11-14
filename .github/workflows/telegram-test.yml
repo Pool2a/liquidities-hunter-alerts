@@ -13,11 +13,16 @@ jobs:
         env:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
         run: |
           TOKEN="$(printf '%s' "$TOKEN" | tr -d '[:space:]')"
 
-          curl --fail --silent --show-error \
+          RESPONSE=$(curl --silent --show-error \
             --request POST \
             --url "https://api.telegram.org/bot${TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
-            --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !"
+            --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !")
+
+          echo "Réponse Telegram : $RESPONSE"
+
+          echo "$RESPONSE" | grep -q '"ok":true'

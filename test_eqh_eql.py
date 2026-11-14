@@ -5,10 +5,11 @@ import urllib.parse
 
 BASE_URL = "https://eea.okx.com"
 
+# Correspondance exacte des contrats recherchés
 MARKETS = {
-    "BTC": "BTC",
-    "ETH": "ETH",
-    "XAU": "XAU"
+    "BTC": "BTC-USD-UM-XPERP",
+    "ETH": "ETH-USD-UM-XPERP",
+    "XAU": "XAU-USD-UM-XPERP"
 }
 
 TIMEFRAMES = {
@@ -51,18 +52,14 @@ def find_contracts():
             continue
 
         for item in result.get("data", []):
-            inst_id = item.get("instId", "")
-            upper = inst_id.upper()
+            inst_id = item.get("instId", "").upper()
 
             if item.get("state") != "live":
                 continue
 
-            if "XPERP" not in upper and "X-PERP" not in upper:
-                continue
-
-            for symbol, keyword in MARKETS.items():
-                if keyword in upper:
-                    contracts[symbol] = inst_id
+            for symbol, expected_id in MARKETS.items():
+                if inst_id == expected_id:
+                    contracts[symbol] = item["instId"]
 
     return contracts
 
@@ -137,14 +134,27 @@ def detect_pivots(candles, atr_values, is_high):
     for i in range(PIVOT_LEN, length - PIVOT_LEN):
         if is_high:
             price = candles[i]["high"]
-            left = [c["high"] for c in candles[i-PIVOT_LEN:i]]
-            right = [c["high"] for c in candles[i+1:i+PIVOT_LEN+1]]
+            left = [
+                c["high"]
+                for c in candles[i-PIVOT_LEN:i]
+            ]
+            right = [
+                c["high"]
+                for c in candles[i+1:i+PIVOT_LEN+1]
+            ]
 
             valid = price >= max(left) and price > max(right)
+
         else:
             price = candles[i]["low"]
-            left = [c["low"] for c in candles[i-PIVOT_LEN:i]]
-            right = [c["low"] for c in candles[i+1:i+PIVOT_LEN+1]]
+            left = [
+                c["low"]
+                for c in candles[i-PIVOT_LEN:i]
+            ]
+            right = [
+                c["low"]
+                for c in candles[i+1:i+PIVOT_LEN+1]
+            ]
 
             valid = price <= min(left) and price < min(right)
 
@@ -173,7 +183,9 @@ def detect_equal_levels(pivots):
                     (current_atr + previous_atr) / 2
                 ) * EQ_ATR
 
-                difference = abs(pivot["price"] - previous["price"])
+                difference = abs(
+                    pivot["price"] - previous["price"]
+                )
 
                 if difference <= tolerance:
                     signals.append(pivot)
@@ -190,22 +202,38 @@ def main():
 
     contracts = find_contracts()
 
+    print("\nCONTROLE DES CONTRATS")
+
+    for symbol, expected_id in MARKETS.items():
+        if symbol in contracts:
+            print(symbol, ":", contracts[symbol])
+        else:
+            print("CONTRAT INTROUVABLE :", expected_id)
+
     for symbol in MARKETS:
         if symbol not in contracts:
-            print(f"CONTRAT INTROUVABLE : {symbol}")
+            continue
 
-    for symbol, inst_id in contracts.items():
-        print(f"\n========== {symbol} ==========")
-        print("Contrat :", inst_id)
+        inst_id = contracts[symbol]
+
+        print("\n================================")
+        print("MARCHE :", symbol)
+        print("CONTRAT :", inst_id)
+        print("================================")
 
         for timeframe, bar in TIMEFRAMES.items():
-            print(f"\n--- {timeframe} ---")
+            print("\n---", timeframe, "---")
 
             try:
                 candles = get_candles(inst_id, bar)
 
+                print("Bougies utilisees :", len(candles))
+
                 if len(candles) < 2 * PIVOT_LEN + ATR_LEN:
-                    print("Historique insuffisant :", len(candles))
+                    print(
+                        "Historique insuffisant :",
+                        len(candles)
+                    )
                     continue
 
                 atr_values = calculate_atr(candles)
@@ -221,7 +249,6 @@ def main():
                 eqh = detect_equal_levels(high_pivots)
                 eql = detect_equal_levels(low_pivots)
 
-                print("Bougies utilisees :", len(candles))
                 print("Pivots hauts :", len(high_pivots))
                 print("Pivots bas :", len(low_pivots))
                 print("EQH detectes :", len(eqh))
@@ -241,4 +268,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

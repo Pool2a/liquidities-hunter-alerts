@@ -6,9 +6,9 @@ import urllib.parse
 BASE_URL = "https://eea.okx.com"
 
 MARKETS = {
-    "BTC": "BTC-USD-UM-XPERP-310404",
-    "ETH": "ETH-USD-UM-XPERP-310404",
-    "XAU": "XAU-USD-UM-XPERP-310502"
+    "BTC": "BTC",
+    "ETH": "ETH",
+    "OR": "XAU"
 }
 
 TIMEFRAMES = {
@@ -39,7 +39,7 @@ def api_get(path, params):
 
 
 def find_contracts():
-    contracts = {}
+    found = {}
 
     for inst_type in ["FUTURES", "SWAP"]:
         result = api_get(
@@ -48,19 +48,35 @@ def find_contracts():
         )
 
         if result.get("code") != "0":
+            print("Erreur instruments :", result.get("msg"))
             continue
 
-        for item in result.get("data", []):
-            inst_id = item.get("instId", "").upper()
+        for instrument in result.get("data", []):
+            inst_id = instrument.get("instId", "")
 
-            if item.get("state") != "live":
+            if instrument.get("state") != "live":
                 continue
 
-            for symbol, expected_id in MARKETS.items():
-                if inst_id == expected_id:
-                    contracts[symbol] = item["instId"]
+            upper_id = inst_id.upper()
 
-    return contracts
+            if "XPERP" not in upper_id:
+                continue
+
+            for symbol, keyword in MARKETS.items():
+
+                if keyword not in upper_id:
+                    continue
+
+                # Exclusion des autres actifs contenant ETH
+                if symbol == "ETH" and "ETHFI" in upper_id:
+                    continue
+
+                item = (inst_type, inst_id)
+
+                if symbol not in found:
+                    found[symbol] = item
+
+    return found
 
 
 def get_candles(inst_id, bar):
@@ -105,6 +121,7 @@ def calculate_atr(candles):
             tr = high - low
         else:
             previous_close = candles[i - 1]["close"]
+
             tr = max(
                 high - low,
                 abs(high - previous_close),
@@ -120,7 +137,10 @@ def calculate_atr(candles):
     atr_values[ATR_LEN - 1] = atr
 
     for i in range(ATR_LEN, len(tr_values)):
-        atr = ((atr * (ATR_LEN - 1)) + tr_values[i]) / ATR_LEN
+        atr = (
+            (atr * (ATR_LEN - 1)) + tr_values[i]
+        ) / ATR_LEN
+
         atr_values[i] = atr
 
     return atr_values
@@ -131,12 +151,15 @@ def detect_pivots(candles, atr_values, is_high):
     length = len(candles)
 
     for i in range(PIVOT_LEN, length - PIVOT_LEN):
+
         if is_high:
             price = candles[i]["high"]
+
             left = [
                 c["high"]
                 for c in candles[i-PIVOT_LEN:i]
             ]
+
             right = [
                 c["high"]
                 for c in candles[i+1:i+PIVOT_LEN+1]
@@ -146,10 +169,12 @@ def detect_pivots(candles, atr_values, is_high):
 
         else:
             price = candles[i]["low"]
+
             left = [
                 c["low"]
                 for c in candles[i-PIVOT_LEN:i]
             ]
+
             right = [
                 c["low"]
                 for c in candles[i+1:i+PIVOT_LEN+1]
@@ -173,11 +198,13 @@ def detect_equal_levels(pivots):
     previous = None
 
     for pivot in pivots:
+
         if previous is not None:
             current_atr = pivot["atr"]
             previous_atr = previous["atr"]
 
             if current_atr is not None and previous_atr is not None:
+
                 tolerance = (
                     (current_atr + previous_atr) / 2
                 ) * EQ_ATR
@@ -201,19 +228,32 @@ def main():
 
     contracts = find_contracts()
 
-    print("\nCONTROLE DES CONTRATS")
-
-    for symbol, expected_id in MARKETS.items():
-        if symbol in contracts:
-            print(symbol, ":", contracts[symbol])
-        else:
-            print("CONTRAT INTROUVABLE :", expected_id)
+    print("\n=== CONTROLE DES CONTRATS ===")
 
     for symbol in MARKETS:
+
+        if symbol in contracts:
+            inst_type, inst_id = contracts[symbol]
+
+            print(
+                symbol,
+                "-",
+                inst_type,
+                "-",
+                inst_id
+            )
+
+        else:
+            print("CONTRAT INTROUVABLE :", symbol)
+
+    print("\n=== ANALYSE EQH / EQL ===")
+
+    for symbol in MARKETS:
+
         if symbol not in contracts:
             continue
 
-        inst_id = contracts[symbol]
+        inst_type, inst_id = contracts[symbol]
 
         print("\n================================")
         print("MARCHE :", symbol)
@@ -221,6 +261,7 @@ def main():
         print("================================")
 
         for timeframe, bar in TIMEFRAMES.items():
+
             print("\n---", timeframe, "---")
 
             try:

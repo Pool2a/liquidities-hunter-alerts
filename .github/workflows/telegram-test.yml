@@ -9,22 +9,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Telegram configuration
+      - name: Send Telegram test
         env:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "ERREUR : token absent ou secret inaccessible"
-            exit 1
-          fi
+          RESPONSE=$(curl --silent --show-error \
+            --get \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !" \
+            "https://api.telegram.org/bot${TOKEN}/sendMessage")
 
-          if [ -z "$CHAT_ID" ]; then
-            echo "ERREUR : Chat ID absent"
-            exit 1
-          fi
-
-          echo "Token présent : oui"
-          echo "Longueur du token : ${#TOKEN}"
-          echo "Chat ID présent : oui"
-          echo "Configuration chargée correctement"
+          echo "$RESPONSE" | grep -q '"ok":true'
+          echo "Message Telegram envoyé avec succès."

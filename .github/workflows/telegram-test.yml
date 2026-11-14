@@ -6,7 +6,7 @@ on:
 
 jobs:
   telegram-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Send Telegram test
@@ -14,11 +14,9 @@ jobs:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          RESPONSE=$(curl --silent --show-error \
-            --get \
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${TOKEN}" \
             --data-urlencode "chat_id=${CHAT_ID}" \
             --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !" \
-            "https://api.telegram.org/bot${TOKEN}/sendMessage")
-
-          echo "$RESPONSE" | grep -q '"ok":true'
-          echo "Message Telegram envoyé avec succès."
+            "https://api.telegram.org/sendMessage"

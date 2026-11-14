@@ -23,7 +23,9 @@ TIMEFRAMES = {
 PIVOT_LEN = 5
 ATR_LEN = 14
 EQ_ATR = 0.20
+
 LIMIT = 300
+M15_LIMIT = 900
 
 
 def api_get(path, params):
@@ -77,22 +79,87 @@ def find_contracts():
     return found
 
 
-def get_candles(inst_id, bar):
-    result = api_get(
-        "/api/v5/market/candles",
-        {
-            "instId": inst_id,
-            "bar": bar,
-            "limit": str(LIMIT)
-        }
-    )
+def get_candles(inst_id, bar, limit=LIMIT):
 
-    if result.get("code") != "0":
-        raise RuntimeError(result.get("msg", "Erreur OKX"))
+    # Pour les autres timeframes :
+    # on conserve exactement la récupération précédente.
+    if limit <= 300:
+        result = api_get(
+            "/api/v5/market/candles",
+            {
+                "instId": inst_id,
+                "bar": bar,
+                "limit": str(limit)
+            }
+        )
+
+        if result.get("code") != "0":
+            raise RuntimeError(result.get("msg", "Erreur OKX"))
+
+        rows = result.get("data", [])
+
+    # Pour M15 :
+    # récupération paginée de 900 bougies clôturées.
+    else:
+        collected = {}
+        after = None
+
+        while len(collected) < limit:
+
+            params = {
+                "instId": inst_id,
+                "bar": bar,
+                "limit": "300"
+            }
+
+            if after is not None:
+                params["after"] = str(after)
+
+            result = api_get(
+                "/api/v5/market/candles",
+                params
+            )
+
+            if result.get("code") != "0":
+                raise RuntimeError(result.get("msg", "Erreur OKX"))
+
+            batch = result.get("data", [])
+
+            if not batch:
+                break
+
+            previous_count = len(collected)
+
+            for row in batch:
+                if row[8] == "1":
+                    collected[int(row[0])] = row
+
+            oldest_timestamp = min(
+                int(row[0]) for row in batch
+            )
+
+            if len(collected) == previous_count:
+                break
+
+            after = oldest_timestamp
+
+            if len(batch) < 300:
+                break
+
+        rows = list(collected.values())
+
+        if len(rows) < limit:
+            print(
+                "Attention : seulement",
+                len(rows),
+                "bougies clôturées récupérées sur",
+                limit,
+                "demandées."
+            )
 
     candles = []
 
-    for row in result.get("data", []):
+    for row in rows:
         if row[8] != "1":
             continue
 
@@ -104,7 +171,8 @@ def get_candles(inst_id, bar):
         })
 
     candles.sort(key=lambda candle: candle["time"])
-    return candles
+
+    return candles[-limit:]
 
 
 def calculate_atr(candles):
@@ -277,6 +345,8 @@ def main():
     print("================================")
     print(" LIQUIDITIES HUNTER - EQH/EQL")
     print(" AFFICHAGE DETAILLE V2")
+    print(" M15 : 900 BOUGIES")
+    print(" AUTRES TF : 300 BOUGIES")
     print("================================")
 
     contracts = find_contracts()
@@ -317,7 +387,16 @@ def main():
             print("\n---", timeframe, "---")
 
             try:
-                candles = get_candles(inst_id, bar)
+                requested_limit = (
+                    M15_LIMIT if timeframe == "M15"
+                    else LIMIT
+                )
+
+                candles = get_candles(
+                    inst_id,
+                    bar,
+                    requested_limit
+                )
 
                 print("Bougies utilisees :", len(candles))
 

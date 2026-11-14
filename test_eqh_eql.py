@@ -2,6 +2,7 @@
 import json
 import urllib.request
 import urllib.parse
+from datetime import datetime, timezone
 
 BASE_URL = "https://eea.okx.com"
 
@@ -28,7 +29,6 @@ LIMIT = 300
 def api_get(path, params):
     query = urllib.parse.urlencode(params)
     url = f"{BASE_URL}{path}?{query}"
-
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "LiquiditiesHunter/1.0"}
@@ -63,11 +63,9 @@ def find_contracts():
                 continue
 
             for symbol, keyword in MARKETS.items():
-
                 if keyword not in upper_id:
                     continue
 
-                # Exclusion des autres actifs contenant ETH
                 if symbol == "ETH" and "ETHFI" in upper_id:
                     continue
 
@@ -221,6 +219,30 @@ def detect_equal_levels(pivots):
     return signals
 
 
+def display_levels(title, signals):
+
+    print("\n" + title)
+
+    if not signals:
+        print("Aucun niveau détecté")
+        return
+
+    for number, signal in enumerate(signals, start=1):
+
+        date = datetime.fromtimestamp(
+            signal["time"] / 1000,
+            timezone.utc
+        ).strftime("%Y-%m-%d %H:%M UTC")
+
+        print(
+            number,
+            "| Prix :",
+            signal["price"],
+            "| Date :",
+            date
+        )
+
+
 def main():
     print("================================")
     print(" LIQUIDITIES HUNTER - EQH/EQL")
@@ -242,7 +264,6 @@ def main():
                 "-",
                 inst_id
             )
-
         else:
             print("CONTRAT INTROUVABLE :", symbol)
 
@@ -294,11 +315,8 @@ def main():
                 print("EQH detectes :", len(eqh))
                 print("EQL detectes :", len(eql))
 
-                if eqh:
-                    print("Dernier EQH :", eqh[-1]["price"])
-
-                if eql:
-                    print("Dernier EQL :", eql[-1]["price"])
+                display_levels("DETAIL DES EQH :", eqh)
+                display_levels("DETAIL DES EQL :", eql)
 
             except Exception as error:
                 print("ERREUR :", error)

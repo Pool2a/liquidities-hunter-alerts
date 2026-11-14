@@ -14,9 +14,10 @@ jobs:
           TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          TOKEN="$(printf '%s' "$TOKEN" | tr -d '[:space:]')"
+
           curl --fail --silent --show-error \
             --request POST \
-            --header "Authorization: Bearer ${TOKEN}" \
+            --url "https://api.telegram.org/bot${TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${CHAT_ID}" \
-            --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !" \
-            "https://api.telegram.org/sendMessage"
+            --data-urlencode "text=Liquidities Hunter : connexion Telegram réussie !"

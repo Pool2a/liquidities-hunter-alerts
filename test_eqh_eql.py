@@ -5,11 +5,10 @@ import urllib.parse
 
 BASE_URL = "https://eea.okx.com"
 
-# Correspondance exacte des contrats recherchés
 MARKETS = {
-    "BTC": "BTC-USD-UM-XPERP",
-    "ETH": "ETH-USD-UM-XPERP",
-    "XAU": "XAU-USD-UM-XPERP"
+    "BTC": "BTC-USD-UM-XPERP-310404",
+    "ETH": "ETH-USD-UM-XPERP-310404",
+    "XAU": "XAU-USD-UM-XPERP-310502"
 }
 
 TIMEFRAMES = {
